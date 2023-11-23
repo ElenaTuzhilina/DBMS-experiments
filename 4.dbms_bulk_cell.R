@@ -5,6 +5,8 @@ source("DBMS/distributions.R")
 source("functions.R")
 library(segmented)
 library(htmlwidgets)
+library(tictoc)
+library(hicrep)
 
 ############# Load data ####################
 
@@ -27,15 +29,16 @@ C[cbind(data$j, data$i)] = data$count
 index = which(colSums(C) != 0)
 C = C[index, index]
 n = ncol(C)
-#image.plot(log(C+1))
 
-############# Find train scores for PoisMS, HPoisMS, ZIPoisMS, NBMS (Figure 7, left) ####################
+############# Find train scores for PoisMS, HPoisMS, ZIPoisMS, NBMS  ####################
 
 dfs = seq(10, 100, 10)
 
 update_info = function(C, H, method, param, Theta0, info, method_name){
   #get reconstruction
+  tic()
   sol = DBMS(C, H, param = param, method = method, Theta = Theta0, eps_wpcms = 1e-5, eps_dbms = 1e-5, verbose_dbms = TRUE)
+  save = toc()
   
   if(method_name == "PoisMS") par = NA
   if(method_name %in% c("HPoisMS", "ZIPoisMS")) par =  sol$param$p
@@ -43,7 +46,7 @@ update_info = function(C, H, method, param, Theta0, info, method_name){
   
   #update info
   return(list(info = rbind(info, data.frame("df" = ncol(H), "beta" = sol$param$beta, "param" = par, "epoch" = sol$epoch, "iter_total" = sol$iter_total, 
-                         dbms_evaluate(sol$X, sol$param, C, method, method_name), 
+                         dbms_evaluate(sol$X, sol$param, C, method, method_name), time = save$toc - save$tic,
                          "method" = method_name)), X = sol$X))
 }
 
@@ -85,7 +88,7 @@ for(i in 1:length(dfs)){
 }
 
 
-############# Plot train scores and correlations between E and O counts (Figure 7 and 9, left) ####################
+############# Plot train scores (Figure 9, left) ####################
 
 detect_elbow = function(info, method_name){
   data = info %>% filter(method == method_name)
@@ -115,6 +118,10 @@ ggplot(info, aes(df, loglik, color = method))+
   scale_x_continuous(breaks = dfs)
 ggsave(paste0("Plots/dbms/bulk_cell_chr", chr, "_res", res, ".pdf"), height = 3, width = 3)
 
+############# Plot correlations between E and O counts (Figure 17) ####################
+
+info = info  %>% dplyr::select(-beta, -param, - epoch, -iter_total, -time)
+
 conformations = readRDS(paste0("Results/conformations/smoothing_conformations_chr", chr,"_res", res, ".rds"))
 betas = readRDS(paste0("Results/conformations/smoothing_betas_chr", chr,"_res", res, ".rds"))
 dfs = c(5, 9, 15, 27, 47, 84)
@@ -123,20 +130,55 @@ for(i in 1:length(dfs)){
   sinfo = rbind(sinfo, data.frame(df = dfs[i],  dbms_evaluate(conformations$SPoisMS[[i]], list(beta = betas$SPoisMS[[i]]), C, pois, "PoisMS"), method = "SPoisMS"))
 }
 
-info = info  %>% dplyr::select(-beta, -param, - epoch, -iter_total)
 rbind(info, sinfo) %>% 
+  dplyr::select(df, method,  corE, spcorE, strcorE) %>%
+  gather(type, cor, 3:5) %>% 
+  mutate(type = ifelse(type == "corE", "Pearson", ifelse(type == "spcorE", "Spearman", "stratified"))) %>%
   mutate(method = factor(method, levels = c("PoisMS","SPoisMS", "HPoisMS", "ZIPoisMS", "NBMS"))) %>%
-  ggplot(aes(df, corE, color = method))+
+  ggplot(aes(df, cor, color = method))+
   geom_line()+
   geom_point()+
   scale_color_manual(values = cbPalette[c(4, 1, 2, 3, 7)])+
   ylab("train correlation")+
   xlab("degrees-of-freedom")+
-  #theme(legend.position="none")+
-  scale_x_continuous(breaks = seq(10, 100, 10))
-ggsave(paste0("Plots/dbms/bulk_cell_cor_chr", chr, "_res", res, ".pdf"), height = 3, width = 4)
+  scale_x_continuous(breaks = seq(10, 100, 10))+
+  facet_wrap(~type, scales = "free")
+ggsave(paste0("Plots/dbms/bulk_cell_cors_chr", chr, "_res", res, ".pdf"), height = 3, width = 8)
 
-############# Find and plot conformations for PoisMS, HPoisMS, ZIPoisMS, NBMS with optimal df (Figure 6) ####################
+############# Plot convergence performance (Figure 13 and 19) ####################
+
+info %>%
+  mutate(method = factor(method, levels = c("PoisMS", "HPoisMS", "ZIPoisMS", "NBMS"))) %>%
+  ggplot(aes(df, time, color = method))+
+  geom_line()+
+  geom_point()+
+  xlab("degrees-of-freedom")+
+  ylab("time (secs)")+
+  scale_color_manual(values = cbPalette[c(4, 2, 3, 7)])
+ggsave(paste0("Plots/dbms/time_chr", chr, "_res", res, ".pdf"), height = 3, width = 4.5)
+
+info %>%
+  mutate(method = factor(method, levels = c("PoisMS", "HPoisMS", "ZIPoisMS", "NBMS"))) %>%
+  ggplot(aes(df, iter_total, color = method))+
+  geom_line()+
+  geom_point()+
+  xlab("degrees-of-freedom")+
+  ylab("total iterations")+
+  scale_color_manual(values = cbPalette[c(4, 2, 3, 7)])
+ggsave(paste0("Plots/dbms/iters_chr", chr, "_res", res, ".pdf"), height = 3, width = 4.5)
+
+info %>%
+  mutate(method = factor(method, levels = c("PoisMS", "HPoisMS", "ZIPoisMS", "NBMS"))) %>%
+  ggplot(aes(df, epoch, color = method))+
+  geom_line()+
+  geom_point()+
+  xlab("degrees-of-freedom")+
+  ylab("epochs")+
+  scale_color_manual(values = cbPalette[c(4, 2, 3, 7)])+
+  theme(legend.position = "none")
+ggsave(paste0("Plots/dbms/epochs_chr", chr, "_res", res, ".pdf"), height = 3, width = 3.5)
+
+############# Find and plot optimal conformations for PoisMS, HPoisMS, ZIPoisMS, NBMS with optimal df (Figure 8) ####################
 
 elbow = elbow %>% mutate(df = round(df))
 

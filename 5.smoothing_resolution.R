@@ -9,7 +9,7 @@ library(dplyr)
 library(plotly)
 library(reshape2)
 library(GGally)
-cbPalette = c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+library(hicrep)
 
 ############# Load data ####################
 
@@ -34,7 +34,6 @@ load_C = function(res){
   C = C[index, index]
   n = ncol(C)
   saveRDS(list(n = n, C = C, index = index, index_kb = (index-1)*res), paste0("Results/info/conformations_chr", chr,"_res", res, ".rds"))
-  #image.plot(log(C+1))
   return(list(C = C, index = index))
 }
 
@@ -64,7 +63,6 @@ for(j in 1:length(ress)){
   
   dr = DR(index)
   K = dr$K
-  #plot(dr$s)
   k = ks[j]
   H = dr$H[,1:k]
   
@@ -108,22 +106,23 @@ for(j in 1:length(ress)){
   rownames(X0) = paste0("loci", index_kb)
 }
 
-############# Align dfs for different resolutions ####################
+############# Align dfs for different resolutions (Figure 4 and 15, top-left) ####################
 
 dfs = c()
 for(res in ress) dfs = rbind(dfs, data.frame(read.csv(paste0("Results/smoothing/dfs_chr", chr,"_res", res,"_ws.csv"), sep = ","), res))
 
 dfs %>% mutate(resolution = paste0(res, "kb")) %>%
+  mutate(resolution = factor(resolution, levels = paste0(ress, "kb"))) %>%
   ggplot(aes(log(lambda, 10), df, color = resolution))+
   geom_point()+
   geom_line()+
   xlab(expression(log[10](lambda)))+
   ylab("degrees−of−freedom")+
-  labs(color = "resolution")
-ggsave(paste0("Plots/resolution/dfs_chr", chr, ".pdf"), width = 4, height = 4)
+  labs(color = "resolution")+
+  scale_color_manual(values = gg_color_hue(4))
+ggsave(paste0("Plots/resolution/dfs_chr", chr, ".pdf"), width = 4, height = 3)
 
-
-############# Align conformations and plot them ####################
+############# Align conformations and plot them (Figure 4 and 16, top-right and bottom) ####################
 
 Lambda_rescale = function(res, num, res0){
   conf = readRDS(paste0("Results/conformations/smoothed_conformations_chr", chr, "_res", res, "_ws.rds"))
@@ -196,14 +195,91 @@ for(i in 1:3){
                 lower = list(continuous =  wrap("smooth", se = F, color = "black", color = cbPalette[6])))+
     xlab("expected counts")+
     ylab("expected counts")
-  ggsave(paste0("Plots/resolution/ecount_correlation_chr", chr, "_res", res, "_df", adfs[i], ".png"), plt, width = 8, height = 8)
+  ggsave(paste0("Plots/resolution/ecount_correlation_chr", chr, "_res", res, "_df", adfs[i], ".png"), plt, width = 6, height = 6)
   plot_3D(Xs, gg_color_hue(4), paste0(ress, "kb")) %>%
     saveWidget(paste0("Plots/resolution/conformations_aligned_chr", chr, "_res", res, "_df", adfs[i], ".html"), selfcontained = F, libdir = "lib")
   plt = mutate(Xflats, index = as.numeric(index), resolution = paste0(resolution, "kb")) %>%
     ggplot(aes(index, value, color = resolution))+
     geom_line()+
     facet_grid(rows = vars(coordinate))
-  ggsave(paste0("Plots/resolution/projections_aligned_chr", chr, "_res", res, "_df", adfs[i], ".pdf"), plt, width = 5, height = 3)
+  ggsave(paste0("Plots/resolution/projections_aligned_chr", chr, "_res", 100, "_df", adfs[i], ".pdf"), plt, width = 5, height = 3)
 }
+
+
+############# Add stratified correlation (Fig 4 and 16, bottom) ####################
+
+Lambda_rescale = function(res, num, res0){
+  conf = readRDS(paste0("Results/conformations/smoothed_conformations_chr", chr, "_res", res, "_ws.rds"))
+  X = conf$conformations[[num]]
+  beta = conf$betas[[num]]
+  index_kb = readRDS(paste0("Results/info/conformations_chr", chr, "_res", res, ".rds"))$index_kb
+  L = Lambda(X, beta)
+  Lflat = data.frame(expand_grid(i = index_kb, j = index_kb), count = c(L)) %>% 
+    mutate(i = i - i %% res0, j = j - j %% res0) %>%
+    group_by(i,j) %>% summarize(count = sum(count)) %>% ungroup()
+  data = Lflat %>% mutate(i = (i - min(Lflat$i))/res0 + 1, j = (j - min(Lflat$j))/res0 + 1)
+  n = max(c(data$i, data$j))
+  L = matrix(0, n, n)
+  L[cbind(data$i, data$j)] = data$count
+  #filter
+  index = which(colSums(L) != 0)
+  L = L[index, index]
+  return(list(mat = L, flat = Lflat))
+}
+
+corlist = function(x, y){
+  rho = cor(x, y)
+  rhosp = cor(x, y, method="spearman")
+  matx = matrix(NA, n, n)
+  matx[cbind(coords$i, coords$j)] = x
+  matx[cbind(coords$j, coords$i)] = x
+  maty = matrix(NA, n, n)
+  maty[cbind(coords$i, coords$j)] = y
+  maty[cbind(coords$j, coords$i)] = y
+  rhostr = get.scc(matx, maty, resol = 100000, h = 5)$scc
+  paste("pearson:", signif(rho, 4), "\n", "spearman:", signif(rhosp, 4), "\n", "stratified:", signif(rhostr, 4))
+}
+
+ggcor = function(data, mapping, ...){
+  # takes in x and y for each panel
+  L1 = eval_data_col(data, mapping$x)
+  L2 = eval_data_col(data, mapping$y)
+  #main correlation
+  ggplot(data = data, mapping = mapping) +
+    annotate(x = 0.5, y = 0.8, label = corlist(L1, L2), geom = "text", size = 3) +
+    theme_void() + ylim(c(0, 1))
+}
+
+adfs = c(15, 25, 50)
+for(i in 1:3){
+  Ls = list()
+  name = c()
+  for(j in 1:length(ress)){
+    Ls[[j]] = Lambda_rescale(ress[j], 3+i-j+1, 100)
+    if(j == 1){
+      Lflats = Ls[[j]]$flat
+    } 
+    else {
+      Lflats = left_join(Lflats, Ls[[j]]$flat, by = c("i" = "i", "j" = "j"))
+    } 
+  }
+  coords = Lflats %>% filter(i <= j) %>% 
+    dplyr::select(i, j) %>%
+    mutate(mini = min(i), minj = min(j)) %>% 
+    mutate(i=(i-mini)/100+1, j = (j-minj)/100+1) %>% 
+    dplyr::select(-mini, -minj)
+  n = max(c(coords$i, coords$j))
+  Lflats = Lflats %>% filter(i <= j) %>% dplyr::select(-i, -j)
+  colnames(Lflats) = paste0("resolution ", ress, "kb")
+  
+  plt = ggpairs(Lflats, columns = 1:4, aes(alpha = 0.1),
+          upper = list(continuous = ggcor),
+          lower = list(continuous =  wrap("smooth", se = F, color = "black", color = cbPalette[6])))+
+    xlab("expected counts")+
+    ylab("expected counts")
+  ggsave(paste0("Plots/resolution/ecount_correlations_chr", chr, "_res", 100, "_df", adfs[i], ".png"), plt, width = 6, height = 6)
+}
+
+
 
 

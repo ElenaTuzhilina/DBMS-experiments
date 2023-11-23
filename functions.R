@@ -69,6 +69,8 @@ dbms_evaluate = function(X, param, C, method, method_name){
              corL = cor(c(C), c(L)),
              spcorE = cor(c(C), c(E), method = "spearman"),
              spcorL = cor(c(C), c(L), method = "spearman"),
+             strcorE = get.scc(C, E, resol = 50000, h = 5)$scc,
+             strcorL = get.scc(C, L, resol = 50000, h = 5)$scc,
              mseE = mean((C-E)^2),
              mseL = mean((C-L)^2))
 }
@@ -96,6 +98,44 @@ align = function(X, Y){
     flip = (sum(refl < 0) > 0)
   }
   return(list(X = X, Y = Y))
+}
+
+#align two reconstructions using procrustes and pre-smoothing
+
+smooth_X = function(X, width){
+  Xsmooth = data.frame(X) %>% 
+    mutate_all(~rollapply(., width = width, FUN = function(x) mean(x, na.rm=TRUE), by = 1, by.column = TRUE, partial = TRUE, fill = NA, align = "center")) %>%
+    as.matrix()
+}
+
+smooth_align = function(X, Y, width, smoothX = TRUE, smoothY = TRUE){
+  if(smoothX) Xsmooth = smooth_X(X, width)
+  else Xsmooth = X
+  indexX = which(rowSums(is.na(Xsmooth)) == 0)
+  if(smoothY) Ysmooth = smooth_X(Y, width)
+  else Ysmooth = Y
+  indexY = which(rowSums(is.na(Ysmooth)) == 0)
+  index = intersect(indexX, indexY)
+  Xsmooth = Xsmooth[index,]
+  Ysmooth = Ysmooth[index,]
+  mX = colMeans(Xsmooth)
+  mY = colMeans(Ysmooth)
+  Xsmooth = scale(Xsmooth, center = mX, scale = FALSE)
+  Ysmooth = scale(Ysmooth, center = mY, scale = FALSE)
+  X = scale(X, center = mX, scale = FALSE)
+  Y = scale(Y, center = mY, scale = FALSE)
+  flip = TRUE
+  while(flip){
+    proc = procrustes(Xsmooth, Ysmooth, scale = TRUE)
+    R = proc$rotation
+    Ysmooth = Ysmooth %*% R
+    Y = Y %*% R
+    refl = sign(diag(cor(Xsmooth, Ysmooth)))
+    Ysmooth = scale(Ysmooth, center = FALSE, scale = refl)
+    Y = scale(Y, center = FALSE, scale = refl)
+    flip = (sum(refl < 0) > 0)
+  }
+  return(list(X = X, Y = Y, ss = mean((X - Y)^2, na.rm = T), ssmooth = mean((Xsmooth - Ysmooth)^2)))
 }
 
 #reduce resolution of HiC data
@@ -167,7 +207,9 @@ plot_flat = function(X){
   plt = Xflat %>%
     mutate(index = as.numeric(index)) %>%
     ggplot(aes(index, value, color = coordinate))+
-    geom_line()
+    geom_line()+
+    facet_grid(rows = vars(coordinate))+
+    theme(legend.position = "none")
   return(plt)
 }
 

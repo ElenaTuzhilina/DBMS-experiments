@@ -9,7 +9,7 @@ library(ggplot2)
 ############# Load data ####################
 
 get_cell = function(num){
-  df = as.matrix(read.csv(paste('Data/sparse_contact_cell', num, '.csv', sep = ''), header = FALSE))
+  df = as.matrix(read.csv(paste('Data/Single cell/sparse_contact_cell', num, '.csv', sep = ''), header = FALSE))
   n = df[1,1]
   C = matrix(0, n, n)    
   C[df[-1,1:2]] = df[-1,3]
@@ -34,7 +34,7 @@ bulk = function(seed){
               test = C_test[index, index]))
 }
 
-############# Find test scores for PoisMS, HPoisMS, ZIPoisMS, NBMS (Figure 7, right) ####################
+############# Find test scores for PoisMS, HPoisMS, ZIPoisMS, NBMS ####################
 
 update_info = function(C, H, method, param, Theta0, seed, info, method_name){
   #get reconstruction
@@ -88,7 +88,7 @@ for(seed in 1:B){
   }
 }
 
-############# Plot test scores and correlations between E and O counts (Figure 7 and 9, left) ####################
+############# Plot test scores (Figure 9, right) ####################
 
 info = read.csv("Results/dbms/cv_single_cell.csv")
 info_sum = info %>% group_by(df, method, data) %>%
@@ -118,20 +118,4 @@ ggplot(aes(df, loglik, color = method, fill = method))+
   ylab("test loss")+
   xlab("degrees-of-freedom")
 ggsave(paste0("Plots/dbms/cv_single_cell_chr", chr, "_res", res, ".pdf"), height = 3, width = 4)
-
-info_max = info_sum %>% filter(data == "test") %>%
-  group_by(method) %>% 
-  slice(which.max(cor))
-
-info_sum %>% filter(data == "test") %>%
-ggplot(aes(df, mse, color = method, fill = method))+
-  geom_ribbon(aes(ymax = upper_mse, ymin = lower_mse), alpha = 0.2, color = NA, linetype = "dashed")+
-  geom_line()+
-  geom_point()+
-  geom_point(info_max, mapping = aes(df, mse, color = method), size = 3, shape = 4)+
-  scale_color_manual(values = cbPalette[c(4, 2, 3, 7)])+
-  scale_fill_manual(values = cbPalette[c(4, 2, 3, 7)])+
-  ylab("test mse")+
-  xlab("degrees-of-freedom")
-ggsave(paste0("Plots/dbms/cv_single_cell_cor_chr", chr, "_res", res, ".pdf"), height = 3, width = 4)
 

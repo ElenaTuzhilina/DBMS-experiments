@@ -10,7 +10,6 @@ library(plotly)
 library(ggplot2)
 library(fields)
 library(splines)
-cbPalette = c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 ############# Load data ####################
 
@@ -31,12 +30,11 @@ C[cbind(data$i, data$j)] = data$count
 C[cbind(data$j, data$i)] = data$count
 #filter
 index = which(colSums(C) != 0)
-#index = index[-(1:45)]
 C = C[index, index]
 n = ncol(C)
 #write.table(C, paste0("Data/hic_chr", chr, "_res", res, ".csv"), row.names = F, col.names = F, sep = ",")
 
-############# Plot contact matrix ####################
+############# Plot contact matrix (Figure 6, right) ####################
 
 png(paste0("Plots/motivation/contact_chr", chr, "_res", res,".png"))
 image.plot(ifelse(log(C) == -Inf, NA, log(C)), axes = F, zlim = c(0,9))
@@ -44,7 +42,7 @@ axis(1, at = seq(0, n, by = 100)/n, labels = seq(0, n, by = 100))
 axis(2, at = seq(0, n, by = 100)/n, labels = seq(0, n, by = 100))
 dev.off()
 
-############# Plot correlation of errors (Figure 1 left) ####################
+############# Plot correlation of errors (Figure 1, left) ####################
 
 df = 25
 H = load_H(df, index)
@@ -60,7 +58,7 @@ axis(1, at = seq(0, n, by = 100)/n, labels = seq(0, n, by = 100))
 axis(2, at = seq(0, n, by = 100)/n, labels = seq(0, n, by = 100))
 dev.off()
 
-############# Plot overdispersion (Figure 5) ####################
+############# Plot overdispersion (Figure 7) ####################
 
 data.frame(lambda = C[upper.tri(C)], count = L[upper.tri(L)])  %>%
   ggplot(aes(lambda, count))+
@@ -72,7 +70,7 @@ data.frame(lambda = C[upper.tri(C)], count = L[upper.tri(L)])  %>%
   geom_abline(aes(slope = 1, intercept = 0), color = "black", linetype = "dashed", size = 1)
 ggsave(paste0("Plots/motivation/overdispersion_chr", chr, "_res", res, ".png"), width = 6, height = 3.5)
 
-############# Compute BCV scores (for Figure 1, right) ####################
+############# Compute BCV scores ####################
 
 #20-fold cross-validation
 train_data = function(C, H, unobs){

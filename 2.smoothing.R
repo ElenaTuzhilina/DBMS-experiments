@@ -10,7 +10,7 @@ library(plotly)
 
 ############# Load data ####################
 
-res = 50
+res = 10
 chr = 21
 start = 15200000
 end = 48100000
@@ -27,7 +27,6 @@ C[cbind(data$i, data$j)] = data$count
 C[cbind(data$j, data$i)] = data$count
 #filter
 index = which(colSums(C) != 0)
-#index = index[-(1:45)]
 C = C[index, index]
 n = ncol(C)
 
@@ -99,7 +98,7 @@ for(seed in 0:(seeds-1)){
   }
 }
 
-############# Compare number of iterations required for convergence of SPoisMS and PoisMS (Figure 4, left) ####################
+############# Compare number of iterations required for convergence of SPoisMS and PoisMS (Figure 5, left) ####################
 
 dfs = read.csv(paste0("Results/smoothing/dfs_chr", chr,"_res", res, ".csv"))
 iters = read.csv(paste0("Results/smoothing/iters_chr", chr,"_res", res, ".csv"))
@@ -118,7 +117,7 @@ ggplot(iters %>% filter(seed == 0),
   theme(legend.position="none")
 ggsave(paste0("Plots/smoothing/iters_chr", chr,"_res", res, ".pdf"), height = 3, width = 3)  
 
-############# Compare reconstruction smoothess measured in angles for SPoisMS and PoisMS (Figure 8) ####################
+############# Compare reconstruction smoothness measured in angles for SPoisMS and PoisMS (Figure 14) ####################
 
 angles = read.csv(paste0("Results/smoothing/angles_chr", chr,"_res", res, ".csv"))
 plt1 = ggplot(angles %>% filter(seed == 0), 
@@ -177,3 +176,16 @@ plt2 = ggplot(Xs, aes(index, value, color = method, frame = log(lambda, 10)))+
   ylab(NULL)
 saveWidget(ggplotly(plt2), paste0("Plots/smoothing/coordinates_chr", chr,"_res", res, ".html"), selfcontained = F, libdir = "lib")
 
+############# Plot expected counts for SPoisMS (Figure 6, left) ####################
+
+conformations = readRDS(paste0("Results/conformations/smoothing_conformations_chr", chr,"_res", res, ".rds"))
+betas = readRDS(paste0("Results/conformations/smoothing_betas_chr", chr,"_res", res, ".rds"))
+dfs = c(5, 9, 15, 27, 47, 84)
+X = conformations$SPoisMS[[which(dfs == 15)]]
+beta = betas$SPoisMS[[which(dfs == 15)]]
+E = expected(X, list(beta = beta), "PoisMS")
+png(paste0("Plots/conformations/SPoisMS_logEheatmap_chr", chr, "_res", res, ".png"))
+image.plot(log(E), axes = F, zlim = c(0,9))
+axis(1, at = seq(0, n, by = 100)/n, labels = seq(0, n, by = 100))
+axis(2, at = seq(0, n, by = 100)/n, labels = seq(0, n, by = 100))
+dev.off()
