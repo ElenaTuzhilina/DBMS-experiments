@@ -108,14 +108,15 @@ info_min = info_sum %>% filter(data == "test") %>%
   slice(which.min(loglik))
 
 info_sum %>% filter(data == "test") %>%
-ggplot(aes(df, loglik, color = method, fill = method))+
-  geom_ribbon(aes(ymax = upper_loglik, ymin = lower_loglik), alpha = 0.2, color = NA, linetype = "dashed")+
+ggplot(aes(df, loglik, color = method, fill = method, linetype = method))+
+  geom_ribbon(aes(ymax = upper_loglik, ymin = lower_loglik), alpha = 0.1, color = NA, linetype = "dashed")+
   geom_line()+
   geom_point()+
   geom_point(info_min, mapping = aes(df, loglik, color = method), size = 3, shape = 4)+
   scale_color_manual(values = cbPalette[c(4, 2, 3, 7)])+
   scale_fill_manual(values = cbPalette[c(4, 2, 3, 7)])+
   ylab("test loss")+
-  xlab("degrees-of-freedom")
-ggsave(paste0("Plots/dbms/cv_single_cell_chr", chr, "_res", res, ".pdf"), height = 3, width = 4)
+  xlab("degrees-of-freedom")+
+  theme_bw()
+ggsave(paste0("Plots/dbms/cv_single_cell.pdf"), height = 3, width = 4)
 

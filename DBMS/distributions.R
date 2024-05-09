@@ -33,6 +33,7 @@ sgd = function(param, method, eps, verbose){
   return(param)
 }
 
+######################discrete#########################
 
 pois = list(
   loss = function(X, C, param){
@@ -214,6 +215,71 @@ nbin = list(
     cat("\n update r")
     param$r = sgd(param$r, method_newton, eps, verbose)
     
+    cat("\n\n")
+    return(param)
+  }
+)
+
+##################continuous########################
+
+norm = list(
+  loss = function(X, C, param){
+    beta = param$beta
+    sigma2 = param$sigma2
+    D = as.matrix(dist(X, diag = TRUE, upper = TRUE))
+    M = -D^2 + beta
+    obj = log(2*pi*sigma2) + (C - M)^2/sigma2
+    return(1/2*mean(obj))
+  },
+  
+  deriv = function(X, C, param, var){
+    beta = param$beta
+    D = as.matrix(dist(X, diag = TRUE, upper = TRUE))
+    M = -D^2 + beta
+    H = matrix(1, nrow(X), nrow(X))
+    G = -M + C
+    if(var == "D2") return(list(G = G, H = H))
+  },
+  
+  update_param = function(X, C, param, method, eps, verbose){
+    cat("\n update beta")
+    D = as.matrix(dist(X, diag = TRUE, upper = TRUE))
+    param$beta = mean(D^2 + C)
+    cat("\n update sigma")
+    param$sigma2 = mean((C + D^2 - param$beta)^2)
+    cat("\n\n")
+    return(param)
+  }
+)
+
+expon = list(
+  loss = function(X, C, param){
+    beta = param$beta
+    D = as.matrix(dist(X, diag = TRUE, upper = TRUE))
+    logL = D^2 - beta
+    L = exp(logL)
+    obj = C * L - logL
+    return(mean(obj))
+  },
+  
+  deriv = function(X, C, param, var){
+    beta = param$beta
+    D = as.matrix(dist(X, diag = TRUE, upper = TRUE))
+    logL = D^2 - beta
+    L = exp(logL)
+    H = C * L
+    G = C * L - 1
+    if(var == "D2") return(list(G = G, H = H))
+    else return(list(G = -sum(G), H = sum(H)))
+  },
+  
+  update_param = function(X, C, param, method, eps, verbose){
+    method_newton = list(loss = function(beta) method$loss(X, C, list(beta = beta)),
+                         deriv = function(beta) method$deriv(X, C, list(beta = beta), "beta"),
+                         cond = function(beta) TRUE)
+    cat("\n update beta")
+    param$beta = newton(param$beta, method_newton, eps, verbose)
+
     cat("\n\n")
     return(param)
   }

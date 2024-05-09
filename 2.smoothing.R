@@ -103,7 +103,7 @@ for(seed in 0:(seeds-1)){
 dfs = read.csv(paste0("Results/smoothing/dfs_chr", chr,"_res", res, ".csv"))
 iters = read.csv(paste0("Results/smoothing/iters_chr", chr,"_res", res, ".csv"))
 ggplot(iters %>% filter(seed == 0), 
-       aes(log(lambda, 10), iter, color = method))+
+       aes(log(lambda, 10), iter, color = method, linetype = method))+
   geom_line()+
   geom_point()+
   ylab("number of iterations")+
@@ -114,6 +114,7 @@ ggplot(iters %>% filter(seed == 0),
                      breaks = log(dfs$lambda,10),
                                     labels = round(dfs$df))+
   scale_color_manual(values = cbPalette[c(4, 8)])+
+  theme_bw()+
   theme(legend.position="none")
 ggsave(paste0("Plots/smoothing/iters_chr", chr,"_res", res, ".pdf"), height = 3, width = 3)  
 
@@ -128,7 +129,7 @@ saveWidget(ggplotly(plt1), paste0("Plots/smoothing/angles_chr", chr,"_res", res,
 
 
 ggplot(angles %>% group_by(method, lambda, seed) %>% summarise(mean.angle = mean(angle)), 
-             aes(log(lambda, 10), mean.angle, color = method))+
+             aes(log(lambda, 10), mean.angle, color = method, linetype = method))+
   geom_line()+
   geom_point()+
   xlab(bquote(log[10](lambda)))+
@@ -140,6 +141,7 @@ ggplot(angles %>% group_by(method, lambda, seed) %>% summarise(mean.angle = mean
                      breaks = log(dfs$lambda,10),
                      labels = round(dfs$df))+
   scale_color_manual(values = cbPalette[c(4, 8)])
+  theme_bw()
 ggsave(paste0("Plots/smoothing/angles_chr", chr,"_res", res, ".pdf"), height = 3.5, width = 5)  
 
 

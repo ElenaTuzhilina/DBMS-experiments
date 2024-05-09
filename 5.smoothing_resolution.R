@@ -106,23 +106,24 @@ for(j in 1:length(ress)){
   rownames(X0) = paste0("loci", index_kb)
 }
 
-############# Align dfs for different resolutions (Figure 4 and 15, top-left) ####################
+############# Align dfs for different resolutions (Figure 4, top-left) ####################
 
 dfs = c()
 for(res in ress) dfs = rbind(dfs, data.frame(read.csv(paste0("Results/smoothing/dfs_chr", chr,"_res", res,"_ws.csv"), sep = ","), res))
 
 dfs %>% mutate(resolution = paste0(res, "kb")) %>%
   mutate(resolution = factor(resolution, levels = paste0(ress, "kb"))) %>%
-  ggplot(aes(log(lambda, 10), df, color = resolution))+
+  ggplot(aes(log(lambda, 10), df, color = resolution, linetype = resolution))+
   geom_point()+
   geom_line()+
   xlab(expression(log[10](lambda)))+
   ylab("degrees−of−freedom")+
   labs(color = "resolution")+
-  scale_color_manual(values = gg_color_hue(4))
+  scale_color_manual(values = gg_color_hue(4))+
+  theme_bw()
 ggsave(paste0("Plots/resolution/dfs_chr", chr, ".pdf"), width = 4, height = 3)
 
-############# Align conformations and plot them (Figure 4 and 16, top-right and bottom) ####################
+############# Align conformations and plot them (Figure 4, top-right and bottom, and Figure 15) ####################
 
 Lambda_rescale = function(res, num, res0){
   conf = readRDS(paste0("Results/conformations/smoothed_conformations_chr", chr, "_res", res, "_ws.rds"))
@@ -194,7 +195,8 @@ for(i in 1:3){
                 upper = list(continuous = wrap("cor", size = 2.5)),
                 lower = list(continuous =  wrap("smooth", se = F, color = "black", color = cbPalette[6])))+
     xlab("expected counts")+
-    ylab("expected counts")
+    ylab("expected counts")+
+    theme_bw()
   ggsave(paste0("Plots/resolution/ecount_correlation_chr", chr, "_res", res, "_df", adfs[i], ".png"), plt, width = 6, height = 6)
   plot_3D(Xs, gg_color_hue(4), paste0(ress, "kb")) %>%
     saveWidget(paste0("Plots/resolution/conformations_aligned_chr", chr, "_res", res, "_df", adfs[i], ".html"), selfcontained = F, libdir = "lib")
@@ -206,7 +208,7 @@ for(i in 1:3){
 }
 
 
-############# Add stratified correlation (Fig 4 and 16, bottom) ####################
+############# Add stratified correlation (Figure 4, bottom, and 16) ####################
 
 Lambda_rescale = function(res, num, res0){
   conf = readRDS(paste0("Results/conformations/smoothed_conformations_chr", chr, "_res", res, "_ws.rds"))
@@ -237,7 +239,8 @@ corlist = function(x, y){
   maty[cbind(coords$i, coords$j)] = y
   maty[cbind(coords$j, coords$i)] = y
   rhostr = get.scc(matx, maty, resol = 100000, h = 5)$scc
-  paste("pearson:", signif(rho, 4), "\n", "spearman:", signif(rhosp, 4), "\n", "stratified:", signif(rhostr, 4))
+  #paste("pearson:", signif(rho, 4), "\n", "spearman:", signif(rhosp, 4), "\n", "stratified:", signif(rhostr, 4))
+  paste("pearson:", signif(rho, 4), "\n", "stratified:", signif(rhostr, 4))
 }
 
 ggcor = function(data, mapping, ...){
@@ -276,9 +279,11 @@ for(i in 1:3){
           upper = list(continuous = ggcor),
           lower = list(continuous =  wrap("smooth", se = F, color = "black", color = cbPalette[6])))+
     xlab("expected counts")+
-    ylab("expected counts")
+    ylab("expected counts")+
+    theme_bw()
   ggsave(paste0("Plots/resolution/ecount_correlations_chr", chr, "_res", 100, "_df", adfs[i], ".png"), plt, width = 6, height = 6)
 }
+
 
 
 

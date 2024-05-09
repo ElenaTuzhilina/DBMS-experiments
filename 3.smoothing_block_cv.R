@@ -34,7 +34,7 @@ index = which(colSums(C) != 0)
 C = C[index, index]
 n = ncol(C)
 
-############# Find BCV scores for PoisMS and SPoisMS (Figure 5, right) ####################
+############# Find BCV scores for PoisMS and SPoisMS ####################
 
 dr = DR(index)
 K = dr$K
@@ -131,7 +131,7 @@ test_scores_sum = test_scores %>% mutate(lambda = plyr::mapvalues(param, round(i
 test_scores_min = test_scores_sum %>% group_by(method) %>% 
   slice(which.min(mean))
 
-ggplot(test_scores_sum, aes(x = log(lambda, 10), y = mean, color = method, fill = method))+
+ggplot(test_scores_sum, aes(x = log(lambda, 10), y = mean, color = method, fill = method, linetype = method))+
   geom_ribbon(aes(ymin=mean-sd, ymax=mean+sd), alpha = 0.2, color = NA, linetype = "dashed")+
   geom_line()+
   geom_point()+
@@ -144,5 +144,6 @@ ggplot(test_scores_sum, aes(x = log(lambda, 10), y = mean, color = method, fill 
                      labels = round(info$df))+
   scale_color_manual(values = cbPalette[c(4, 8)])+
   scale_fill_manual(values = cbPalette[c(4, 8)])+
-  coord_cartesian(ylim = c(-47, -36))
+  coord_cartesian(ylim = c(-55, -40))+
+  theme_bw()
 ggsave(paste0("Plots/smoothing/bcv_chr", chr, "_res", res, ".pdf"), height = 3, width = 4)

@@ -10,6 +10,7 @@ library(plotly)
 library(ggplot2)
 library(fields)
 library(splines)
+library(HiCdiff)
 
 ############# Load data ####################
 
@@ -32,6 +33,7 @@ C[cbind(data$j, data$i)] = data$count
 index = which(colSums(C) != 0)
 C = C[index, index]
 n = ncol(C)
+Ctilde = KRnorm(C)
 #write.table(C, paste0("Data/hic_chr", chr, "_res", res, ".csv"), row.names = F, col.names = F, sep = ",")
 
 ############# Plot contact matrix (Figure 6, right) ####################
@@ -41,6 +43,13 @@ image.plot(ifelse(log(C) == -Inf, NA, log(C)), axes = F, zlim = c(0,9))
 axis(1, at = seq(0, n, by = 100)/n, labels = seq(0, n, by = 100))
 axis(2, at = seq(0, n, by = 100)/n, labels = seq(0, n, by = 100))
 dev.off()
+
+png(paste0("Plots/motivation/contact_chr", chr, "_res", res,"_norm.png"))
+image.plot(ifelse(log(Ctilde) == -Inf, NA, log(Ctilde)), axes = F, zlim = c(-11,0))
+axis(1, at = seq(0, n, by = 100)/n, labels = seq(0, n, by = 100))
+axis(2, at = seq(0, n, by = 100)/n, labels = seq(0, n, by = 100))
+dev.off()
+
 
 ############# Plot correlation of errors (Figure 1, left) ####################
 
@@ -67,7 +76,8 @@ data.frame(lambda = C[upper.tri(C)], count = L[upper.tri(L)])  %>%
   xlab("expected counts")+
   ylab("observed counts")+
   theme(text = element_text(size = 15))+
-  geom_abline(aes(slope = 1, intercept = 0), color = "black", linetype = "dashed", size = 1)
+  geom_abline(aes(slope = 1, intercept = 0), color = "black", linetype = "dashed", size = 1)+
+  theme_bw()
 ggsave(paste0("Plots/motivation/overdispersion_chr", chr, "_res", res, ".png"), width = 6, height = 3.5)
 
 ############# Compute BCV scores ####################
@@ -130,6 +140,7 @@ ggplot()+
   ylab("test loss")+
   scale_y_continuous(trans = scales::pseudo_log_trans(base = 10), breaks = c(-100, 1, 10^seq(2, 14, 2)))+
   scale_x_continuous(breaks = seq(10, 100, 10))+
-  geom_hline(aes(yintercept = 0), linetype = "dashed", alpha = 0.5)
+  geom_hline(aes(yintercept = 0), linetype = "dashed", alpha = 0.5)+
+  theme_bw()
 ggsave(paste0("Plots/motivation/bcv_poisms_chr", chr, "_res", res, ".pdf"), height = 2.5, width = 4)
 

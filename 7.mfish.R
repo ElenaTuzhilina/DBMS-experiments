@@ -62,15 +62,15 @@ saveRDS(SS, "Results/mfish/mfish_pw_dist_scaled.rds")
 
 ############# Find Procrustes distances between from each conformation and MFISH conformations ####################
 
-get_conformation = function(method, num){
+get_conformation = function(method, num = 0){
   res = 50
   chr = 21
   ext = ".RAWobserved"
   if(method == "SPoisMS"){
     conf = readRDS(paste0("Results/conformations/smoothing_conformations_chr", chr, "_res", res, ".rds"))[[method]][[num]]
   } 
-  if(method %in% c("PoisMS", "HPoisMS", "ZIPoisMS", "NBMS")) {
-    conf = readRDS(paste0("Results/conformations/dbms_conformations_chr", chr, "_res", res, ".csv"))[[method]][[num]]
+  if(method %in% c("PoisMS", "HPoisMS", "ZIPoisMS", "NBMS", "NMS", "EMS")) {
+    conf = readRDS(paste0("Results/conformations/dbms_optimal_conformations_chr", chr, "_res", res, ".rds"))[[method]]$X
   }
   if(method %in% c("PM1", "PM2", "poisson")) conf = read.csv(paste0("Data/PASTIS/", method, ".csv"), header = FALSE, sep = ",") %>% as.matrix()
   index = read.csv("Data/index_hic.csv", header = T)$index
@@ -80,13 +80,14 @@ get_conformation = function(method, num){
   return(X)
 }
 
-methods = c("PM1", "PM2", "poisson", "SPoisMS", "PoisMS", "HPoisMS", "ZIPoisMS", "NBMS")
+methods = c("PM1", "PM2", "poisson", "SPoisMS", "PoisMS", "HPoisMS", "ZIPoisMS", "NBMS", "NMS", "EMS")
 SSconf = c()
 for(method in methods){
   cat(method)
-  if(method %in% c("PoisMS", "SPoisMS")) num = 3
-  if(method %in% c("HPoisMS","ZIPoisMS", "NBMS")) num = 2
-  if(method %in% c("PM1","PM2", "poisson")) num = 0
+  if(method == "SPoisMS") num = 3
+  #if(method %in% c("PoisMS", "SPoisMS")) num = 3
+  #if(method %in% c("HPoisMS","ZIPoisMS", "NBMS")) num = 2
+  #if(method %in% c("PM1","PM2", "poisson")) num = 0
   Y = get_conformation(method, num)
   cat("\ni: ")
   for(i in 1:nrep){
@@ -95,28 +96,50 @@ for(method in methods){
     sa = smooth_align(X, Y, width = 0, smoothX = F, smoothY = F)
     SSconf = rbind(SSconf, data.frame(ss = sa$ss, method))
   }
-  saveRDS(SSconf, "Results/mfish/mfish_conf_dist_scaled.rds")
+  saveRDS(SSconf, "Results/mfish/mfish_conf_dist_scaled_norm.rds")
 }
 
-############# Compare the distribution of Procrustes distances to PASTIS and our methods (Figure 10) ####################
+ ############# Compare the distribution of Procrustes distances to PASTIS and our methods (Figure 10 and 22) ####################
 
 SS = readRDS("Results/mfish/mfish_pw_dist_scaled.rds")
-SSconf = readRDS("Results/mfish/mfish_conf_dist_scaled.rds")
+SSconf = readRDS("Results/mfish/mfish_conf_dist_scaled_norm.rds")
 
-rbind(data.frame(ss = SS[upper.tri(SS)], method = "MFISH", group = rep(methods, rep(length(SS[upper.tri(SS)]), 8))), 
-SSconf %>% mutate(group = method)) %>%
+methods = c("PM1", "PM2", "poisson", "SPoisMS", "PoisMS", "HPoisMS", "ZIPoisMS", "NBMS")
+
+rbind(data.frame(ss = SS[upper.tri(SS)], method = "MFISH", group = rep(methods, rep(length(SS[upper.tri(SS)]), length(methods)))),
+      SSconf %>% filter(method %in% methods) %>%
+        mutate(group = method)) %>%
   mutate(group = ifelse(group == "PM1", "PASTIS-PM1", ifelse(group == "PM2", "PASTIS-PM2", ifelse(group == "poisson", "PASTIS-Poisson", group)))) %>%
-  mutate(group = factor(group, levels = c("PASTIS-PM1", "PASTIS-PM2", "PASTIS-Poisson", "SPoisMS", "PoisMS", "HPoisMS", "ZIPoisMS", "NBMS")),
+  mutate(group = factor(group, levels = c("PASTIS-PM1", "PASTIS-PM2", "PASTIS-Poisson", methods[-(1:3)])),
          method = factor(method, levels = c("MFISH", methods))) %>%
   ggplot(aes(x = log(ss, 10), y=..density.., fill = method, color = method))+
   geom_histogram(position = "identity", alpha = 0.3, bins = 25, color = NA)+
   geom_density(alpha = 0.1)+
   facet_wrap(~group)+
   xlab("log(procrustes distance)")+
+  theme_bw()+
   theme(legend.position = "none")+
-  scale_color_manual(values = c("black", gg_color_hue(8)))+
-  scale_fill_manual(values = c("black", gg_color_hue(8)))
+  scale_color_manual(values = c("black", gg_color_hue(length(methods))))+
+  scale_fill_manual(values = c("black", gg_color_hue(length(methods))))
 ggsave("Plots/mfish/compare_distributions.pdf", height = 5, width = 7)
+
+
+methods = c("NMS", "EMS")
+rbind(data.frame(ss = SS[upper.tri(SS)], method = "MFISH", group = rep(methods, rep(length(SS[upper.tri(SS)]), length(methods)))), 
+      SSconf %>% filter(method %in% methods) %>%
+        mutate(group = method)) %>%
+  mutate(group = factor(group, c(methods)),
+         method = factor(method, levels = c("MFISH", methods))) %>%
+  ggplot(aes(x = log(ss, 10), y=..density.., fill = method, color = method))+
+  geom_histogram(position = "identity", alpha = 0.3, bins = 20, color = NA)+
+  geom_density(alpha = 0.1)+
+  facet_wrap(~group)+
+  xlab("log(procrustes distance)")+
+  theme_bw()+
+  theme(legend.position = "none")+
+  scale_color_manual(values = c("black", cbPalette[c(5, 6)]))+
+  scale_fill_manual(values = c("black", cbPalette[c(5, 6)]))
+ggsave("Plots/mfish/compare_distributions_norm.pdf", height = 3, width = 5)
 
 for(method in methods){
   cat("\n", method, ":")
